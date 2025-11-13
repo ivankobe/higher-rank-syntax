@@ -57,3 +57,10 @@ end
   - T can be equiupped with a functor structure
   - η and lift are then natural transformations
 -/
+
+section
+  universe u₁ u₂ v₁ v₂
+
+  variable {A : Type u₁} [Category.{v₁} A]
+  variable {E : Type u₂} [Category.{v₂} E]
+  variable (J : A ⥤ E)
