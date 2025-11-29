@@ -217,13 +217,7 @@ lemma unitR (α : Arity) : concat α A0 = α := by
       exact unitR_aux dom arr
     · unfold concat_dom
       exact hdom_eq
-    · unfold concat_arr
-      congr!
-      · exact unitR_aux dom arr
-      · simp!
-        aesop?
-        · sorry
-        · sorry
+    · sorry
 
 notation (priority := default) "Shape" => Arity
 
