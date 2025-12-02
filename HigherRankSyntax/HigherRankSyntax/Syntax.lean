@@ -206,18 +206,23 @@ def unitR_aux (dom : Position) (arr : dom → Arity) : (Arity.mk dom arr).dom.op
   apply Quot.sound
   exact Position'.eq.unitR' P
 
+
 lemma unitR (α : Arity) : concat α A0 = α := by
   match α with
   | ⟨dom, arr⟩ =>
-    simp_all only [Arity.mk.injEq]
+    induction dom using Quot.ind
+    rename_i dom
+    unfold A0
+    unfold concat
+    unfold concat_dom
+    unfold Position.oplus
+    simp [Quot.eq.mpr]
     apply And.intro
-    have hdom_eq : concat_dom (Arity.mk dom arr) A0 = dom := by
-      unfold concat_dom
-      simp [A0]
-      exact unitR_aux dom arr
-    · unfold concat_dom
-      exact hdom_eq
-    · sorry
+    · apply unitR_aux
+    · unfold concat_arr
+      simp!
+      unfold Position.len
+      aesop
 
 notation (priority := default) "Shape" => Arity
 
