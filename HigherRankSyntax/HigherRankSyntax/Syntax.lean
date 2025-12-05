@@ -15,67 +15,20 @@ open CategoryTheory
 
 set_option autoImplicit false
 
-inductive Position' where
-  | empty : Position'
-  | slot : Position'
-  | oplus : Position' → Position' → Position'
+notation (priority := default) "Position" => Nat
 
-inductive Position'.eq : Position' → Position' → Prop where
-  | refl : (P : Position') → Position'.eq P P
-  | unitR : (P : Position') → Position'.eq P (.oplus P .empty)
-  | unitR' : (P : Position') → Position'.eq (.oplus P .empty) P
-  | unitL : (P : Position') → Position'.eq P (.oplus .empty P)
-  | assoc : (P Q R : Position') →
-      Position'.eq (.oplus P (.oplus Q R)) (.oplus (.oplus P Q) R)
-  | oplusCongrL : (P P' Q : Position') → P.eq P' → Position'.eq (P.oplus Q) (P'.oplus Q)
-  | oplusCongrR : (P Q Q' : Position') → Q.eq Q' → Position'.eq (P.oplus Q) (P.oplus Q')
-
-def Position : Type := Quot Position'.eq
-
-@[reducible]
-def Position'.len : Position' → Nat
-  | .empty => 0
-  | .slot => 1
-  | .oplus P Q => P.len + Q.len
-
-lemma Position'.len.wd (P Q : Position') (h : P.eq Q) : P.len = Q.len :=
-  match h with
-  | .refl _ => .refl _
-  | .unitL P => by simp
-  | .unitR P => by simp
-  | .unitR' P => by simp
-  | .assoc P Q R => by
-      unfold Position'.len
-      have h : (Q.oplus R).len = Q.len + R.len := by simp
-      have h' : (P.oplus Q).len = P.len + Q.len := by simp
-      rw [h, h']
-      omega
-  | .oplusCongrL P Q R e => by
-      unfold Position'.len
-      rw [Position'.len.wd P Q e]
-  | .oplusCongrR P Q R e => by
-      unfold Position'.len
-      rw [Position'.len.wd Q R e]
-
-@[reducible]
-def Position'.toType (P : Position') : Type := Fin P.len
-
-lemma Position.toType.wd (P Q : Position') (e : P.eq Q) : P.toType = Q.toType := by
-  unfold Position'.toType
-  rw [Position'.len.wd P Q e]
-
-@[reducible]
-def Position.toType : Position → Type :=
-  Quot.lift Position'.toType Position.toType.wd
+def Nat.toType (P : Position) : Type := Fin P
 
 instance : CoeSort Position Type where
-  coe := Position.toType
+  coe := Nat.toType
 
 inductive Arity : Type where
   | mk : (dom : Position) → (dom.toType → Arity) → Arity
 
+variable {n m : Nat}
+
 @[reducible]
-def A0 : Arity := Arity.mk (.mk _ Position'.empty) Fin.elim0
+def A0 : Arity := Arity.mk 0 Fin.elim0
 
 def Arity.dom : Arity → Position := fun ⟨X,_⟩ => X
 
@@ -87,142 +40,61 @@ instance : CoeSort Arity Type where
 instance : CoeFun Arity (fun α => α → Arity) where
   coe := Arity.arity
 
-@[reducible]
-def Position.len (P : Position) : Nat :=
-  Quot.lift Position'.len Position'.len.wd P
-
-@[reducible]
-def Position'.oplus' (α β : Position') : Position := .mk _ (α.oplus β)
-
-def Position'.oplus'.wd₀ (P Q Q' : Position') (h : Q.eq Q') :
-  P.oplus' Q = P.oplus' Q' := match h with
-  | .refl _ => .refl _
-  | .unitR _ => by
-    unfold oplus'
-    apply Quot.sound
-    exact Position'.eq.oplusCongrR _ _ _ (Position'.eq.unitR Q)
-  | .unitR' _ => by
-    unfold oplus'
-    apply Quot.sound
-    apply Position'.eq.oplusCongrR
-    apply Position'.eq.unitR' _
-  | .unitL _ => by
-    unfold oplus'
-    apply Quot.sound
-    exact Position'.eq.oplusCongrR _ _ _ (Position'.eq.unitL Q)
-  | .assoc R S T => by
-    unfold oplus'
-    apply Quot.sound
-    apply Position'.eq.oplusCongrR
-    apply Position'.eq.assoc
-  | .oplusCongrL R S T e => by
-    unfold oplus'
-    apply Quot.sound
-    apply Position'.eq.oplusCongrR
-    apply Position'.eq.oplusCongrL
-    exact e
-  | .oplusCongrR R S T e => by
-    unfold oplus'
-    apply Quot.sound
-    apply Position'.eq.oplusCongrR
-    apply Position'.eq.oplusCongrR
-    exact e
-
-def Position'.oplus'.wd₁ (P P' Q : Position') (h : P.eq P') :
-  P.oplus' Q = P'.oplus' Q := match h with
-  | .refl _ => .refl _
-  | .unitL P => by
-    unfold oplus'
-    apply Quot.sound
-    exact Position'.eq.oplusCongrL _ _ _ (Position'.eq.unitL P)
-  | .unitR _ => by
-    unfold oplus'
-    apply Quot.sound
-    exact Position'.eq.oplusCongrL _ _ _ (Position'.eq.unitR P)
-  | .unitR' _ => by
-    unfold oplus'
-    apply Quot.sound
-    apply Position'.eq.oplusCongrL
-    apply Position'.eq.unitR' _
-  | .assoc R S T => by
-    unfold oplus'
-    apply Quot.sound
-    apply Position'.eq.oplusCongrL
-    apply Position'.eq.assoc
-  | .oplusCongrL R S T e => by
-    unfold oplus'
-    apply Quot.sound
-    apply Position'.eq.oplusCongrL
-    apply Position'.eq.oplusCongrL
-    exact e
-  | .oplusCongrR R S T e => by
-    unfold oplus'
-    apply Quot.sound
-    apply Position'.eq.oplusCongrL
-    apply Position'.eq.oplusCongrR
-    exact e
-
-@[reducible]
-def Position.oplus : (α β : Position) → Position :=
-  Quot.lift₂ Position'.oplus' Position'.oplus'.wd₀  Position'.oplus'.wd₁
-
-lemma foo (P Q : Position) : (Position.oplus P Q).toType = Fin (P.len + Q.len) := by
-  refine Quot.induction_on₂ P Q (λ p q => ?_)
-  aesop
-
-lemma bar (P : Position) : P.toType = Fin P.len := by
-  refine Quot.induction_on P (λ p => ?_)
-  aesop
+def Arity.ext (u v : Arity) (e : u.dom = v.dom) :
+    (∀ (x : u.dom), u.arity x = v.arity (Fin.cast e x)) → u = v := by
+  intro h
+  cases u with | mk dom_u f_u =>
+  cases v with | mk dom_v f_v =>
+  simp [Arity.dom, Arity.arity] at e h
+  subst e
+  have : f_u = f_v := by
+    funext x
+    exact h x
+  subst this
+  rfl
 
 @[reducible]
 def concat_dom (α : Arity) (β : Arity) : Position :=
-  Position.oplus α.dom β.dom
+  α.dom + β.dom
 
 def concat_arr (α : Arity) (β : Arity) : concat_dom α β → Arity := fun x => by
-  unfold concat_dom at x
-  rewrite [foo α.dom β.dom] at x
-  exact match x with
-  | ⟨n,h⟩ =>
-    if h : (n : Nat) < α.dom.len then by
-      apply α.arity
-      rw [bar α.dom]
-      use n
-    else by
-      let j : β.dom.toType := by
-        rw [bar β.dom]
-        use n - α.dom.len
-        omega
-      exact β j
+  unfold concat_dom Nat.toType at x
+  if h : x < α.dom then exact α ⟨x , h⟩
+  else
+    let x' : Fin β.dom := by use x - α.dom ; omega
+    exact β x'
 
 @[reducible]
 def concat (α : Arity) (β : Arity) : Arity :=
     .mk (concat_dom α β) (concat_arr α β)
 
-def unitR_aux (dom : Position) (arr : dom → Arity) : (Arity.mk dom arr).dom.oplus A0.dom = dom := by
-  unfold A0
-  simp [Position.oplus]
-  show Quot.lift₂ Position'.oplus' Position'.oplus'.wd₀ Position'.oplus'.wd₁ dom (Quot.mk Position'.eq Position'.empty) = dom
-  refine Quot.induction_on dom (fun P => ?_)
-  apply Quot.sound
-  exact Position'.eq.unitR' P
+notation (priority := default+1) γ:31 " ⊕ " δ:31 => concat γ δ
 
+lemma Arity.unitR (α : Arity) : concat α A0 = α := by
+  unfold concat A0 concat_dom concat_arr
+  simp_all only [Fin.eta]
+  induction α
+  simp_all only [mk.injEq, heq_eq_eq]
+  apply And.intro
+  · rfl
+  · simp!
 
-lemma unitR (α : Arity) : concat α A0 = α := by
-  match α with
-  | ⟨dom, arr⟩ =>
-    induction dom using Quot.ind
-    rename_i dom
-    unfold A0
-    unfold concat
-    unfold concat_dom
-    unfold Position.oplus
-    simp [Quot.eq.mpr]
-    apply And.intro
-    · apply unitR_aux
-    · unfold concat_arr
+lemma Arity.unitL (α : Arity) : concat A0 α = α := by
+  apply Arity.ext
+  intro x
+  case e => simp!
+  case a =>
+    unfold concat A0
+    simp!
+    unfold concat_arr
+    unfold Arity.dom concat A0 concat_dom Nat.toType at x
+    simp! only at x
+    simp! only
+    split
+    next h => simp! at h
+    next h =>
+      induction x
       simp!
-      unfold Position.len
-      aesop
 
 notation (priority := default) "Shape" => Arity
 
@@ -233,21 +105,18 @@ inductive Expr : (σ γ : Shape) → (α : Arity) → Type where
 
 def ExprUnitR {σ γ : Shape} {α : Arity} :
   Expr σ γ (concat α A0) → Expr σ γ α := fun x => by
-  rw [← unitR α]
+  rw [← Arity.unitR α]
   exact x
 
+def ExprUnitL {σ γ : Shape} {α : Arity} :
+  Expr σ γ (concat A0 α) → Expr σ γ α := fun x => by
+  rw [← Arity.unitL α]
+  exact x
 
--- inductive ExpressionAux : Shape → Type :=
---   | app : ∀ {γ : Shape} (x : γ),
---       (∀ (i : γ x),  ExpressionAux (γ ⊕ γ x i)) → ExpressionAux γ
+def V (γ : Shape) (α : Arity) : Type := { x : γ | γ x = α }
 
--- def Expression : Shape → Arity → Type := fun γ α =>
---   ExpressionAux (γ ⊕ α)
-
--- def V (γ : Shape) (α : Arity) : Type := { x : γ | γ x = α }
-
--- instance {γ : Shape} {α : Arity} : CoeOut (V γ α) γ where
---   coe x := x.val
+instance {γ : Shape} {α : Arity} : CoeOut (V γ α) γ where
+  coe x := x.val
 
 -- def Arity.subArities (α : Arity) : List Arity :=
 --   match α with
@@ -260,9 +129,16 @@ def ExprUnitR {σ γ : Shape} {α : Arity} :
 --       let α2 : Arity := Arity.mk X2 (λ x => p (Sum.inr x))
 --       α1.subArities ++ α2.subArities
 
--- def Arity.sizeOf (α : Arity) : Nat := match α with
+def Arity.rank (α : Arity) :=
+  match α with
+  | .mk X A =>
+    match (List.map (λ x => Arity.rank (A x)) (List.finRange X)).maximum with
+    | none   => 0
+    | some n => n + 1
+
+-- match α with
 --   | .mk X A =>
---     match (List.map (λ x => (A x).sizeOf) X.toList).maximum with
+--     match (List.map (λ x => (A x).rank) X.toList).maximum with
 --     | none   => 0
 --     | some n => n + 1
 
