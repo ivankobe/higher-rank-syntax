@@ -1,6 +1,9 @@
 import Lean.Level
 import Mathlib.CategoryTheory.Category.Basic
+import Mathlib.CategoryTheory.Functor.Basic
+import Mathlib.CategoryTheory.Functor.Category
 import Mathlib.CategoryTheory.DiscreteCategory
+import Mathlib.CategoryTheory.Types
 import Mathlib.Data.Fintype.Basic
 import Mathlib.Data.Finset.Max
 import Mathlib.Data.Finset.Union
@@ -26,8 +29,6 @@ instance : CoeSort Position Type where
 
 inductive Arity : Type where
   | mk : (dom : Position) → (dom.toType → Arity) → Arity
-
-variable {n m : Nat}
 
 @[reducible]
 def A0 : Arity := Arity.mk 0 Fin.elim0
@@ -71,7 +72,6 @@ def concat (α : Arity) (β : Arity) : Arity :=
     .mk (concat_dom α β) (concat_arr α β)
 
 notation (priority := default+1) γ:31 " ⊕ " δ:31 => concat γ δ
-
 
 ------------------ASSOCIATIVITY AND UNITALITY OF ARITY CONCATENATION--------------------
 
@@ -142,9 +142,10 @@ lemma Arity.assoc (α β γ : Arity) : ((α ⊕ β) ⊕ γ) = (α ⊕ (β ⊕ γ
 notation (priority := default) "Shape" => Arity
 
 @[reducible]
-def V (γ : Shape) (α : Arity) : Type := { x : γ | γ x = α }
+def V (_ γ : Shape) (α : Arity) : Type := { x : γ | γ x = α }
 
-instance {γ : Shape} {α : Arity} : CoeOut (V γ α) γ where
+
+instance {σ γ : Shape} {α : Arity} : CoeOut (V σ γ α) γ where
   coe x := x.val
 
 def Position.toList (P : Position) : List (Fin P) := List.finRange P
@@ -484,7 +485,6 @@ def Expr.shiftLeftR {σ γ : Shape} {α β : Arity} (E : Expr σ γ (α ⊕ β))
     apply Expr.free σ (γ ⊕ α) β (Arity.wkL x)
     intro i
     let i' := by rw [← Arity.wkLEq] at i ; exact i
-    let ei := e i'
     let cat := Expr.shiftLeftR (e i')
     let cat' := by rw [← Arity.assoc] at cat ; exact cat
     rw [foo (Eq.symm (Arity.wkLEq x))]
@@ -558,7 +558,7 @@ def L {σ δ : Shape} {α β : Arity} : Expr σ δ (α ⊕ β) → Expr (σ ⊕ 
 
 -----------------------------LIFTING---------------------------------------------------
 
-def lift (σ γ δ : Shape) (f : (α : Arity) → V γ α → Expr σ δ α)
+def lift (σ γ δ : Shape) (f : (α : Arity) → V σ γ α → Expr σ δ α)
   (α : Arity) (E : Expr σ γ α) : Expr σ δ α :=
   match E with
   | .sym _ _ _ s e => by
@@ -566,13 +566,13 @@ def lift (σ γ δ : Shape) (f : (α : Arity) → V γ α → Expr σ δ α)
     intro i
     exact lift σ γ δ f (α ⊕ σ s i) (e i)
   | .free _ _ _ x e => by
-    let g : (β : Arity) → V (γ x) β → Expr (σ ⊕ δ) α β := by
+    let g : (β : Arity) → V σ (γ x) β → Expr (σ ⊕ δ) α β := by
       intro β i
       let this := L (lift σ γ δ f (α ⊕ (γ.arity x) i) (e i))
       obtain ⟨val, p⟩ := i
       rw [← p]
       exact this
-    exact J (lift (σ ⊕ δ) (γ x) α g A0 (I (f (γ x) ⟨x , by simp⟩)))
+    exact J (lift (σ ⊕ δ) (γ x) α g A0 (I (f (γ x) ⟨x, rfl⟩)))
   | .bound _ _ _ y e => by
     apply Expr.bound _ _ _ y
     intro i
@@ -591,3 +591,32 @@ decreasing_by
     apply Arity.subArityLe
   · apply Prod.Lex.right
     apply Expr.subExprLeBound
+
+
+--------------------------UNIT-----------------------------------------
+
+-- @[reducible]
+-- def var (σ γ : Shape) (α : Shape) : V σ γ α → Expr σ γ α := by
+--   intro ⟨x,p⟩
+--   subst p
+--   apply Expr.free σ γ (γ x) x
+--   intro i
+--   apply Expr.shiftRightR
+--   apply Expr.shiftRightL
+--   apply var
+--   use i
+--   simp
+-- termination_by γ.rank
+-- decreasing_by
+--   apply Arity.subArityLe
+
+@[reducible]
+def var (σ γ : Shape) (α : Shape) : V σ γ α → Expr σ γ α :=
+  fun xp =>
+  xp.prop ▸ Expr.free σ γ (γ xp.val) xp.val
+    (λ i => Expr.shiftRightR (Expr.shiftRightL (var (σ ⊕ γ) _ _ ⟨i, rfl⟩)))
+termination_by γ.rank
+decreasing_by
+  apply Arity.subArityLe
+
+#print var._unary
